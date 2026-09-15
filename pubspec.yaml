@@ -1,0 +1,50 @@
+name: dentu_app
+description: "App de pacientes Dentu: seguimiento nutricional."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Textos de Material (fechas, selector de hora, diálogos) en español
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  provider: ^6.1.5+1
+  flutter_secure_storage: ^11.1.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  image_picker: ^1.2.3
+  flutter_local_notifications: ^22.3.0
+  connectivity_plus: ^7.3.1
+  intl: ^0.20.2
+  cached_network_image: ^3.4.1
+  # Ya venía con cached_network_image; se usa directo para borrar del caché las fotos al cerrar sesión
+  flutter_cache_manager: ^3.4.1
+  path_provider: ^2.1.6
+  fl_chart: ^1.2.0
+  timezone: ^0.11.1
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/icon.png
+
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
