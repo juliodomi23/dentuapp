@@ -7,7 +7,7 @@ class AppConfig {
   /// Solo se usa para vincular. Después, la app usa la URL guardada en la sesión.
   static const String apiUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://10.0.2.2:8001',
+    defaultValue: 'https://landing-clinicalgestorv3.y394ci.easypanel.host',
   );
 
   static const bool usarMock = bool.fromEnvironment('USE_MOCK');
