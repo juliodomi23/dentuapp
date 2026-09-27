@@ -74,7 +74,10 @@ void main() {
       );
 
       final ok = await api.guardarEjercicio(fecha: '2026-09-11', minutos: 30, tipo: 'caminata');
-      expect((ok as Ok).value, (minutos: 30, tipo: 'caminata'));
+      expect(
+        (ok as Ok).value,
+        (minutos: 30, tipo: 'caminata', caloriasReloj: null),
+      );
     });
 
     test('puede_registrar del día sigue la misma regla', () async {

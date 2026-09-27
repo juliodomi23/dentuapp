@@ -31,6 +31,12 @@ class VincularViewModel extends ChangeNotifier {
 
   bool get consentimientoAceptado => _auth.consentimiento == true;
 
+  bool consentimientoAceptadoPara({required bool personal}) =>
+      _auth.consentimientoPara(personal: personal) == true;
+
+  bool debePreguntarConsentimientoPara({required bool personal}) =>
+      _auth.consentimientoPara(personal: personal) == null;
+
   bool get sesionExpirada => _auth.sesionExpirada;
 
   /// Se llena al vincular bien; la pantalla muestra la confirmación con la clínica.
@@ -38,11 +44,25 @@ class VincularViewModel extends ChangeNotifier {
 
   String? get mensajeError {
     final resultado = vincular.result;
-    return resultado is Error<PacienteApp> ? mensajeDeError(resultado.error) : null;
+    return resultado is Error<PacienteApp>
+        ? mensajeDeError(resultado.error)
+        : null;
   }
 
   Future<void> responderConsentimiento(bool acepta) async {
     await _auth.guardarConsentimiento(acepta);
+    notifyListeners();
+  }
+
+  Future<void> responderConsentimientoPara(
+    bool acepta, {
+    required bool personal,
+  }) async {
+    if (personal) {
+      await _auth.guardarConsentimientoPersonal(acepta);
+    } else {
+      await _auth.guardarConsentimiento(acepta);
+    }
     notifyListeners();
   }
 

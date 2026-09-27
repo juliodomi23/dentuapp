@@ -41,7 +41,8 @@ class FakeApiService implements ApiService {
   late PacienteApp _paciente;
   final Map<String, RegistroComida> _registros = {};
   final Map<String, int> _agua = {};
-  final Map<String, ({int minutos, String? tipo})> _ejercicio = {};
+  final Map<String, ({int minutos, String? tipo, int? caloriasReloj})>
+  _ejercicio = {};
   final List<PuntoPeso> _pesos = [];
   final List<({RegistroSintomas registro, String origen})> _sintomas = [];
   final Map<String, String> _fotosLocales = {};
@@ -78,6 +79,82 @@ class FakeApiService implements ApiService {
       ResultadoVinculacion(token: 'token-falso', paciente: _paciente),
     );
   }
+
+  @override
+  Future<Result<ResultadoVinculacion>> crearCuentaPersonal({
+    required String nombre,
+    required String email,
+    required String password,
+  }) async {
+    _paciente = PacienteApp(
+      id: 'personal-demo',
+      nombre: nombre,
+      apellido: '',
+      telefono: '',
+      objetivo: null,
+      tienePlan: true,
+      reto21: null,
+      clinica: _paciente.clinica,
+      esPersonal: true,
+    );
+    return Result.ok(
+      ResultadoVinculacion(token: 'token-personal-demo', paciente: _paciente),
+    );
+  }
+
+  @override
+  Future<Result<ResultadoVinculacion>> iniciarCuentaPersonal({
+    required String email,
+    required String password,
+  }) =>
+      crearCuentaPersonal(nombre: 'Usuario', email: email, password: password);
+
+  @override
+  Future<Result<Map<String, dynamic>>> extraerDieta(List<String> rutas) async {
+    return Result.ok({
+      'nombre': 'Mi dieta importada',
+      'notas': 'Revisa las indicaciones originales.',
+      'dias': {
+        for (final dia in kDiasSemana)
+          dia: {
+            for (final tiempo in kTiempos)
+              tiempo: _plan.comidasDe(dia).deTiempo(tiempo),
+          },
+      },
+    });
+  }
+
+  @override
+  Future<Result<Plan>> guardarDietaPersonal(
+    Map<String, dynamic> borrador,
+  ) async {
+    _plan = Plan.fromJson({
+      'id': 'plan-personal-demo',
+      'fecha_inicio': fechaIso(_hoy),
+      'modo': 'menu',
+      'equivalentes': {},
+      'calorias_objetivo': null,
+      'proteinas_g': null,
+      'carbohidratos_g': null,
+      'grasas_g': null,
+      ...borrador,
+    });
+    return Result.ok(_plan);
+  }
+
+  @override
+  Future<Result<Map<String, dynamic>>> consultarIap() async => Result.ok({
+    'requerido': false,
+    'activo': true,
+    'product_id': null,
+    'expira': null,
+    'review_bypass': false,
+  });
+
+  @override
+  Future<Result<Map<String, dynamic>>> validarCompraApple(
+    String recibo,
+  ) async => consultarIap();
 
   @override
   Future<Result<PacienteApp>> obtenerPerfil() async {
@@ -146,7 +223,11 @@ class FakeApiService implements ApiService {
     await _esperar();
     return Result.ok(
       Preparacion.fromJson({
-        'ingredientes': ['1 huevo', '1 tortilla de maíz', '1/4 taza de salsa roja'],
+        'ingredientes': [
+          '1 huevo',
+          '1 tortilla de maíz',
+          '1/4 taza de salsa roja',
+        ],
         'pasos': [
           'Calienta la tortilla en un comal.',
           'Fríe el huevo al gusto.',
@@ -249,10 +330,12 @@ class FakeApiService implements ApiService {
   }
 
   @override
-  Future<Result<({int minutos, String? tipo})>> guardarEjercicio({
+  Future<Result<({int minutos, String? tipo, int? caloriasReloj})>>
+  guardarEjercicio({
     required String fecha,
     required int minutos,
     String? tipo,
+    int? caloriasReloj,
   }) async {
     await _esperar();
     final errorFecha = _validarFechaRegistrable(fecha);
@@ -262,9 +345,19 @@ class FakeApiService implements ApiService {
     }
     final textoTipo = tipo?.trim();
     if ((textoTipo?.length ?? 0) > LimitesRegistro.ejercicioTipoMax) {
-      return _error(400, 'El tipo de ejercicio debe tener máximo 60 caracteres.');
+      return _error(
+        400,
+        'El tipo de ejercicio debe tener máximo 60 caracteres.',
+      );
     }
-    final valor = (minutos: minutos, tipo: textoTipo?.isEmpty ?? true ? null : textoTipo);
+    if (caloriasReloj != null && (caloriasReloj < 0 || caloriasReloj > 5000)) {
+      return _error(400, 'Las calorías del reloj deben estar entre 0 y 5000.');
+    }
+    final valor = (
+      minutos: minutos,
+      tipo: textoTipo?.isEmpty ?? true ? null : textoTipo,
+      caloriasReloj: caloriasReloj,
+    );
     _ejercicio[fecha] = valor;
     return Result.ok(valor);
   }
@@ -295,7 +388,9 @@ class FakeApiService implements ApiService {
       return _error(400, 'El peso debe estar entre 20 y 400 kg.');
     }
     final fechaPeso = fecha ?? fechaIso(_hoy);
-    if (parsearFechaIso(fechaPeso) == null) return _error(400, 'Fecha inválida');
+    if (parsearFechaIso(fechaPeso) == null) {
+      return _error(400, 'Fecha inválida');
+    }
     _pesos
       ..add(PuntoPeso(fecha: fechaPeso, peso: peso, origen: 'app'))
       ..sort((a, b) => a.fecha.compareTo(b.fecha));
@@ -413,6 +508,7 @@ class FakeApiService implements ApiService {
       ],
       ejercicioMin: ejercicio?.minutos ?? 0,
       ejercicioTipo: ejercicio?.tipo,
+      caloriasReloj: ejercicio?.caloriasReloj,
     );
   }
 
@@ -488,9 +584,12 @@ class FakeApiService implements ApiService {
   }
 
   SintomasPromedio _promediarSintomas(String desde, String hasta) {
-    final enRango = _sintomas.map((s) => s.registro).where(
-      (s) => s.fecha!.compareTo(desde) >= 0 && s.fecha!.compareTo(hasta) <= 0,
-    );
+    final enRango = _sintomas
+        .map((s) => s.registro)
+        .where(
+          (s) =>
+              s.fecha!.compareTo(desde) >= 0 && s.fecha!.compareTo(hasta) <= 0,
+        );
     double? promedio(String metrica) {
       final valores = enRango
           .map((s) => s.valores[metrica])
@@ -555,7 +654,9 @@ class FakeApiService implements ApiService {
       });
     return conFoto
         .take(60)
-        .map((r) => FotoProgreso(id: r.fotoId!, fecha: r.fecha, tiempo: r.tiempo))
+        .map(
+          (r) => FotoProgreso(id: r.fotoId!, fecha: r.fecha, tiempo: r.tiempo),
+        )
         .toList();
   }
 
@@ -677,7 +778,10 @@ class FakeApiService implements ApiService {
       'una manzana',
     ];
 
-    void agregar(DateTime dia, String tiempo, String estado, {
+    void agregar(
+      DateTime dia,
+      String tiempo,
+      String estado, {
       String? queComio,
       String origen = 'app',
       String? fotoId,
@@ -740,30 +844,70 @@ class FakeApiService implements ApiService {
       ..[fechaIso(sumarDias(_hoy, -5))] = 4;
 
     _ejercicio
-      ..[fechaIso(_hoy)] = (minutos: 20, tipo: 'caminata')
-      ..[fechaIso(sumarDias(_hoy, -1))] = (minutos: 30, tipo: 'gym')
-      ..[fechaIso(sumarDias(_hoy, -3))] = (minutos: 45, tipo: 'bicicleta');
+      ..[fechaIso(_hoy)] = (minutos: 20, tipo: 'caminata', caloriasReloj: 115)
+      ..[fechaIso(sumarDias(_hoy, -1))] = (
+        minutos: 30,
+        tipo: 'gym',
+        caloriasReloj: 210,
+      )
+      ..[fechaIso(sumarDias(_hoy, -3))] = (
+        minutos: 45,
+        tipo: 'bicicleta',
+        caloriasReloj: null,
+      );
 
     _pesos.addAll([
-      PuntoPeso(fecha: fechaIso(sumarDias(_hoy, -13)), peso: 85.0, origen: 'consulta'),
-      PuntoPeso(fecha: fechaIso(sumarDias(_hoy, -10)), peso: 84.6, origen: 'app'),
-      PuntoPeso(fecha: fechaIso(sumarDias(_hoy, -7)), peso: 84.1, origen: 'whatsapp'),
-      PuntoPeso(fecha: fechaIso(sumarDias(_hoy, -3)), peso: 83.7, origen: 'app'),
-      PuntoPeso(fecha: fechaIso(sumarDias(_hoy, -1)), peso: 83.2, origen: 'app'),
+      PuntoPeso(
+        fecha: fechaIso(sumarDias(_hoy, -13)),
+        peso: 85.0,
+        origen: 'consulta',
+      ),
+      PuntoPeso(
+        fecha: fechaIso(sumarDias(_hoy, -10)),
+        peso: 84.6,
+        origen: 'app',
+      ),
+      PuntoPeso(
+        fecha: fechaIso(sumarDias(_hoy, -7)),
+        peso: 84.1,
+        origen: 'whatsapp',
+      ),
+      PuntoPeso(
+        fecha: fechaIso(sumarDias(_hoy, -3)),
+        peso: 83.7,
+        origen: 'app',
+      ),
+      PuntoPeso(
+        fecha: fechaIso(sumarDias(_hoy, -1)),
+        peso: 83.2,
+        origen: 'app',
+      ),
     ]);
 
     _sintomas.addAll([
       (
         registro: RegistroSintomas(
           fecha: fechaIso(sumarDias(_hoy, -6)),
-          valores: const {'energia': 3, 'digestion': 2, 'hambre': 4, 'sueno': 3, 'animo': 3},
+          valores: const {
+            'energia': 3,
+            'digestion': 2,
+            'hambre': 4,
+            'sueno': 3,
+            'animo': 3,
+          },
         ),
         origen: 'whatsapp',
       ),
       (
         registro: RegistroSintomas(
           fecha: fechaIso(sumarDias(_hoy, -2)),
-          valores: const {'energia': 4, 'digestion': 3, 'hambre': 3, 'sueno': 4, 'animo': 4},
+          valores: const {
+            'energia': 4,
+            'digestion': 3,
+            'hambre': 3,
+            'sueno': 4,
+            'animo': 4,
+          },
         ),
         origen: 'app',
       ),

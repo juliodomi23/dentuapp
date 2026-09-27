@@ -75,7 +75,9 @@ class DiarioRepository extends ChangeNotifier {
     String? nota,
     String? fotoPath,
   }) async {
-    final anterior = _cola.buscar(OperacionPendiente.claveComida(fecha, tiempo));
+    final anterior = _cola.buscar(
+      OperacionPendiente.claveComida(fecha, tiempo),
+    );
     final resultado = await _api.guardarComida(
       fecha: fecha,
       tiempo: tiempo,
@@ -114,10 +116,13 @@ class DiarioRepository extends ChangeNotifier {
   }
 
   Future<Result<void>> borrarComida(String fecha, String tiempo) async {
-    final pendiente = _cola.buscar(OperacionPendiente.claveComida(fecha, tiempo));
+    final pendiente = _cola.buscar(
+      OperacionPendiente.claveComida(fecha, tiempo),
+    );
     if (pendiente != null) await _quitarDeCola(pendiente);
 
-    final hayRegistroEnServidor = _tiempoEnCache(fecha, tiempo)?.registro != null;
+    final hayRegistroEnServidor =
+        _tiempoEnCache(fecha, tiempo)?.registro != null;
     if (pendiente != null && !hayRegistroEnServidor) {
       notifyListeners();
       return const Result.ok(null);
@@ -149,33 +154,56 @@ class DiarioRepository extends ChangeNotifier {
         return resultado;
       case Error(:final error):
         if (!_esErrorDeRed(error)) return resultado;
-        await _cola.guardar(OperacionPendiente.agua(fecha: fecha, aguaVasos: vasos));
+        await _cola.guardar(
+          OperacionPendiente.agua(fecha: fecha, aguaVasos: vasos),
+        );
         notifyListeners();
         return Result.ok(vasos);
     }
   }
 
-  Future<Result<({int minutos, String? tipo})>> guardarEjercicio({
+  Future<Result<({int minutos, String? tipo, int? caloriasReloj})>>
+  guardarEjercicio({
     required String fecha,
     required int minutos,
     String? tipo,
+    int? caloriasReloj,
   }) async {
     final anterior = _cola.buscar(OperacionPendiente.claveEjercicio(fecha));
-    final resultado = await _api.guardarEjercicio(fecha: fecha, minutos: minutos, tipo: tipo);
+    final resultado = await _api.guardarEjercicio(
+      fecha: fecha,
+      minutos: minutos,
+      tipo: tipo,
+      caloriasReloj: caloriasReloj,
+    );
 
     switch (resultado) {
       case Ok(:final value):
         if (anterior != null) await _quitarDeCola(anterior);
-        _ponerEjercicioEnCache(fecha, value.minutos, value.tipo);
+        _ponerEjercicioEnCache(
+          fecha,
+          value.minutos,
+          value.tipo,
+          value.caloriasReloj,
+        );
         notifyListeners();
         return resultado;
       case Error(:final error):
         if (!_esErrorDeRed(error)) return resultado;
         await _cola.guardar(
-          OperacionPendiente.ejercicio(fecha: fecha, ejercicioMin: minutos, ejercicioTipo: tipo),
+          OperacionPendiente.ejercicio(
+            fecha: fecha,
+            ejercicioMin: minutos,
+            ejercicioTipo: tipo,
+            caloriasReloj: caloriasReloj,
+          ),
         );
         notifyListeners();
-        return Result.ok((minutos: minutos, tipo: tipo));
+        return Result.ok((
+          minutos: minutos,
+          tipo: tipo,
+          caloriasReloj: caloriasReloj,
+        ));
     }
   }
 
@@ -209,6 +237,7 @@ class DiarioRepository extends ChangeNotifier {
 
   Future<void> descartarPendientes() async {
     await _cola.borrarTodas();
+    _diasEnCache.clear();
     notifyListeners();
   }
 
@@ -231,7 +260,10 @@ class DiarioRepository extends ChangeNotifier {
   /// Devuelve null si se envió bien, o el error.
   Future<Exception?> _enviar(OperacionPendiente operacion) async {
     if (operacion.tipo == OperacionPendiente.tipoAgua) {
-      final resultado = await _api.guardarAgua(operacion.fecha, operacion.aguaVasos!);
+      final resultado = await _api.guardarAgua(
+        operacion.fecha,
+        operacion.aguaVasos!,
+      );
       switch (resultado) {
         case Ok(:final value):
           _ponerAguaEnCache(operacion.fecha, value);
@@ -246,10 +278,16 @@ class DiarioRepository extends ChangeNotifier {
         fecha: operacion.fecha,
         minutos: operacion.ejercicioMin!,
         tipo: operacion.ejercicioTipo,
+        caloriasReloj: operacion.caloriasReloj,
       );
       switch (resultado) {
         case Ok(:final value):
-          _ponerEjercicioEnCache(operacion.fecha, value.minutos, value.tipo);
+          _ponerEjercicioEnCache(
+            operacion.fecha,
+            value.minutos,
+            value.tipo,
+            value.caloriasReloj,
+          );
           return null;
         case Error(:final error):
           return error;
@@ -279,11 +317,15 @@ class DiarioRepository extends ChangeNotifier {
     final sigueEnCola = actual?.id == operacion.id;
     if (sigueEnCola) await _cola.borrar(operacion.clave);
 
-    final laFotoLaUsaOtra = !sigueEnCola && actual?.fotoPath == operacion.fotoPath;
+    final laFotoLaUsaOtra =
+        !sigueEnCola && actual?.fotoPath == operacion.fotoPath;
     if (!laFotoLaUsaOtra) await _cola.borrarFoto(operacion.fotoPath);
   }
 
-  Future<String?> _fotoParaCola(String? fotoNueva, OperacionPendiente? anterior) async {
+  Future<String?> _fotoParaCola(
+    String? fotoNueva,
+    OperacionPendiente? anterior,
+  ) async {
     if (fotoNueva == null) return anterior?.fotoPath;
     await _cola.borrarFoto(anterior?.fotoPath);
     try {
@@ -295,10 +337,13 @@ class DiarioRepository extends ChangeNotifier {
 
   Dia _conPendientes(Dia dia) {
     final tiempos = [
-      for (final tiempoDia in dia.tiempos) _tiempoConPendiente(dia.fecha, tiempoDia),
+      for (final tiempoDia in dia.tiempos)
+        _tiempoConPendiente(dia.fecha, tiempoDia),
     ];
     final agua = _cola.buscar(OperacionPendiente.claveAgua(dia.fecha));
-    final ejercicio = _cola.buscar(OperacionPendiente.claveEjercicio(dia.fecha));
+    final ejercicio = _cola.buscar(
+      OperacionPendiente.claveEjercicio(dia.fecha),
+    );
     return dia.copyWith(
       tiempos: tiempos,
       faltan: _calcularFaltan(tiempos),
@@ -306,7 +351,9 @@ class DiarioRepository extends ChangeNotifier {
       aguaPendiente: agua != null,
       ejercicioMin: ejercicio?.ejercicioMin,
       ejercicioTipo: ejercicio?.ejercicioTipo,
+      caloriasReloj: ejercicio?.caloriasReloj,
       borrarEjercicioTipo: ejercicio != null && ejercicio.ejercicioTipo == null,
+      borrarCaloriasReloj: ejercicio != null && ejercicio.caloriasReloj == null,
       ejercicioPendiente: ejercicio != null,
     );
   }
@@ -338,11 +385,16 @@ class DiarioRepository extends ChangeNotifier {
     return null;
   }
 
-  void _ponerRegistroEnCache(String fecha, String tiempo, RegistroComida? registro) {
+  void _ponerRegistroEnCache(
+    String fecha,
+    String tiempo,
+    RegistroComida? registro,
+  ) {
     final dia = _diasEnCache[fecha];
     if (dia == null) return;
     final tiempos = [
-      for (final t in dia.tiempos) t.tiempo == tiempo ? t.conRegistro(registro) : t,
+      for (final t in dia.tiempos)
+        t.tiempo == tiempo ? t.conRegistro(registro) : t,
     ];
     _diasEnCache[fecha] = dia.copyWith(
       tiempos: tiempos,
@@ -355,13 +407,20 @@ class DiarioRepository extends ChangeNotifier {
     if (dia != null) _diasEnCache[fecha] = dia.copyWith(aguaVasos: vasos);
   }
 
-  void _ponerEjercicioEnCache(String fecha, int minutos, String? tipo) {
+  void _ponerEjercicioEnCache(
+    String fecha,
+    int minutos,
+    String? tipo,
+    int? caloriasReloj,
+  ) {
     final dia = _diasEnCache[fecha];
     if (dia == null) return;
     _diasEnCache[fecha] = dia.copyWith(
       ejercicioMin: minutos,
       ejercicioTipo: tipo,
+      caloriasReloj: caloriasReloj,
       borrarEjercicioTipo: tipo == null,
+      borrarCaloriasReloj: caloriasReloj == null,
     );
   }
 

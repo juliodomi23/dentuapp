@@ -16,6 +16,7 @@ class OperacionPendiente {
     this.aguaVasos,
     this.ejercicioMin,
     this.ejercicioTipo,
+    this.caloriasReloj,
     this.ultimoError,
   });
 
@@ -39,6 +40,7 @@ class OperacionPendiente {
   final int? aguaVasos;
   final int? ejercicioMin;
   final String? ejercicioTipo;
+  final int? caloriasReloj;
 
   /// Mensaje del servidor si la rechazó por algo que no es de red (p. ej. fecha fuera de rango).
   final String? ultimoError;
@@ -94,6 +96,7 @@ class OperacionPendiente {
     required String fecha,
     required int ejercicioMin,
     String? ejercicioTipo,
+    int? caloriasReloj,
   }) => OperacionPendiente(
     id: _nuevoId(),
     tipo: tipoEjercicio,
@@ -101,6 +104,7 @@ class OperacionPendiente {
     creadaEn: DateTime.now(),
     ejercicioMin: ejercicioMin,
     ejercicioTipo: ejercicioTipo,
+    caloriasReloj: caloriasReloj,
   );
 
   OperacionPendiente conError(String mensaje) => OperacionPendiente(
@@ -116,6 +120,7 @@ class OperacionPendiente {
     aguaVasos: aguaVasos,
     ejercicioMin: ejercicioMin,
     ejercicioTipo: ejercicioTipo,
+    caloriasReloj: caloriasReloj,
     ultimoError: mensaje,
   );
 
@@ -154,6 +159,7 @@ class OperacionPendiente {
     'agua_vasos': aguaVasos,
     'ejercicio_min': ejercicioMin,
     'ejercicio_tipo': ejercicioTipo,
+    'calorias_reloj': caloriasReloj,
     'ultimo_error': ultimoError,
   };
 
@@ -171,6 +177,7 @@ class OperacionPendiente {
         aguaVasos: map['agua_vasos'] as int?,
         ejercicioMin: map['ejercicio_min'] as int?,
         ejercicioTipo: map['ejercicio_tipo'] as String?,
+        caloriasReloj: map['calorias_reloj'] as int?,
         ultimoError: map['ultimo_error'] as String?,
       );
 }

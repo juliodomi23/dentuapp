@@ -30,6 +30,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+/.tool-appdata/
+/.tool-pub-cache/
 /build/
 /coverage/
 

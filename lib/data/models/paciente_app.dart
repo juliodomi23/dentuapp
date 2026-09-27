@@ -60,6 +60,7 @@ class PacienteApp {
     required this.tienePlan,
     required this.reto21,
     required this.clinica,
+    this.esPersonal = false,
   });
 
   final String id;
@@ -70,6 +71,7 @@ class PacienteApp {
   final bool tienePlan;
   final Reto21? reto21;
   final Clinica clinica;
+  final bool esPersonal;
 
   String get nombreCompleto => '$nombre $apellido'.trim();
 
@@ -84,6 +86,7 @@ class PacienteApp {
       tienePlan: json['tiene_plan'] as bool,
       reto21: reto == null ? null : Reto21.fromJson(reto),
       clinica: Clinica.fromJson(json['clinica'] as Map<String, dynamic>),
+      esPersonal: json['es_personal'] as bool? ?? false,
     );
   }
 
@@ -97,6 +100,7 @@ class PacienteApp {
     'tiene_plan': tienePlan,
     'reto_21': reto21?.toJson(),
     'clinica': clinica.toJson(),
+    'es_personal': esPersonal,
   };
 }
 
@@ -109,6 +113,8 @@ class ResultadoVinculacion {
   factory ResultadoVinculacion.fromJson(Map<String, dynamic> json) =>
       ResultadoVinculacion(
         token: json['token'] as String,
-        paciente: PacienteApp.fromJson(json['paciente'] as Map<String, dynamic>),
+        paciente: PacienteApp.fromJson(
+          json['paciente'] as Map<String, dynamic>,
+        ),
       );
 }

@@ -13,7 +13,14 @@ class AppConfig {
   static const bool usarMock = bool.fromEnvironment('USE_MOCK');
 
   /// En modo mock, muestra el plan en modo "equivalentes" en lugar de menú.
-  static const bool mockEquivalentes = bool.fromEnvironment('MOCK_EQUIVALENTES');
+  static const bool mockEquivalentes = bool.fromEnvironment(
+    'MOCK_EQUIVALENTES',
+  );
+
+  static const String iapProductId = String.fromEnvironment(
+    'IAP_PRODUCT_ID',
+    defaultValue: 'com.ambarrojo.dentu.personal.monthly',
+  );
 
   static const Duration timeoutApi = Duration(seconds: 30);
 

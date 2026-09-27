@@ -23,6 +23,63 @@ class EjercicioDetalleScreen extends StatelessWidget {
     if (tipo != null) viewModel.cambiarTipoEjercicio(tipo);
   }
 
+  Future<void> _editarCalorias(BuildContext context) async {
+    final formulario = GlobalKey<FormState>();
+    final texto = TextEditingController(
+      text: viewModel.dia?.caloriasReloj?.toString() ?? '',
+    );
+    final calorias = await showDialog<int?>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Calorías de tu reloj'),
+        content: Form(
+          key: formulario,
+          child: TextFormField(
+            controller: texto,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Calorías activas (kcal)',
+              helperText: 'Escribe el dato que muestra tu smart watch.',
+            ),
+            validator: (valor) {
+              if (valor == null || valor.trim().isEmpty) return null;
+              final numero = int.tryParse(valor.trim());
+              return numero != null && numero >= 0 && numero <= 5000
+                  ? null
+                  : 'Escribe un número entre 0 y 5000.';
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, -1),
+            child: const Text('Quitar dato'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formulario.currentState!.validate()) {
+                Navigator.pop(
+                  dialogContext,
+                  int.tryParse(texto.text.trim()) ?? -1,
+                );
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    texto.dispose();
+    if (calorias != null) {
+      viewModel.cambiarCaloriasReloj(calorias == -1 ? null : calorias);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,27 +103,39 @@ class EjercicioDetalleScreen extends StatelessWidget {
                     children: [
                       Text(
                         minutos == 1 ? '1 minuto' : '$minutos minutos',
-                        style: tema.textTheme.displaySmall?.copyWith(color: tema.colorScheme.tertiary),
+                        style: tema.textTheme.displaySmall?.copyWith(
+                          color: tema.colorScheme.tertiary,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      Text('de ejercicio hoy', style: tema.textTheme.bodyMedium),
+                      Text(
+                        'de ejercicio hoy',
+                        style: tema.textTheme.bodyMedium,
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           ReaccionToque(
-                            builder: (context, envolver) => IconButton.filledTonal(
-                              onPressed: envolver(
-                                habilitado && minutos > 0 ? viewModel.restarMinutosEjercicio : null,
-                              ),
-                              icon: const Icon(Icons.remove_rounded),
-                              tooltip: 'Quitar minutos',
-                            ),
+                            builder: (context, envolver) =>
+                                IconButton.filledTonal(
+                                  onPressed: envolver(
+                                    habilitado && minutos > 0
+                                        ? viewModel.restarMinutosEjercicio
+                                        : null,
+                                  ),
+                                  icon: const Icon(Icons.remove_rounded),
+                                  tooltip: 'Quitar minutos',
+                                ),
                           ),
                           const SizedBox(width: 20),
                           ReaccionToque(
                             builder: (context, envolver) => IconButton.filled(
-                              onPressed: envolver(habilitado ? viewModel.sumarMinutosEjercicio : null),
+                              onPressed: envolver(
+                                habilitado
+                                    ? viewModel.sumarMinutosEjercicio
+                                    : null,
+                              ),
                               icon: const Icon(Icons.add_rounded),
                               tooltip: 'Agregar minutos',
                             ),
@@ -75,12 +144,25 @@ class EjercicioDetalleScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       TextButton.icon(
-                        onPressed: habilitado ? () => _editarTipo(context) : null,
+                        onPressed: habilitado
+                            ? () => _editarTipo(context)
+                            : null,
                         icon: const Icon(Icons.edit_rounded),
                         label: Text(
                           dia?.ejercicioTipo?.isNotEmpty == true
                               ? dia!.ejercicioTipo!
                               : 'Agregar qué hiciste',
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: habilitado
+                            ? () => _editarCalorias(context)
+                            : null,
+                        icon: const Icon(Icons.watch_outlined),
+                        label: Text(
+                          dia?.caloriasReloj == null
+                              ? 'Agregar calorías de mi reloj'
+                              : '${dia!.caloriasReloj} kcal según mi reloj',
                         ),
                       ),
                       if (dia?.ejercicioPendiente ?? false)
@@ -97,7 +179,10 @@ class EjercicioDetalleScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Semantics(
                 header: true,
-                child: Text('Tips de movimiento', style: tema.textTheme.titleMedium),
+                child: Text(
+                  'Tips de movimiento',
+                  style: tema.textTheme.titleMedium,
+                ),
               ),
               const SizedBox(height: 8),
               for (final tip in kTipsEjercicio)
@@ -107,7 +192,10 @@ class EjercicioDetalleScreen extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.directions_walk_rounded, color: tema.colorScheme.tertiary),
+                        Icon(
+                          Icons.directions_walk_rounded,
+                          color: tema.colorScheme.tertiary,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(child: Text(tip)),
                       ],

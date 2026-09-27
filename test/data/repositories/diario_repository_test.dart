@@ -15,7 +15,8 @@ const hoy = '2026-09-11';
 
 /// Backend falso al que se le puede "quitar el internet" para los PUT.
 class ApiConRedControlable extends FakeApiService {
-  ApiConRedControlable() : super(reloj: () => DateTime(2026, 9, 11, 10), demora: Duration.zero);
+  ApiConRedControlable()
+    : super(reloj: () => DateTime(2026, 9, 11, 10), demora: Duration.zero);
 
   bool sinRed = false;
   int enviosComida = 0;
@@ -51,14 +52,21 @@ class ApiConRedControlable extends FakeApiService {
   }
 
   @override
-  Future<Result<({int minutos, String? tipo})>> guardarEjercicio({
+  Future<Result<({int minutos, String? tipo, int? caloriasReloj})>>
+  guardarEjercicio({
     required String fecha,
     required int minutos,
     String? tipo,
+    int? caloriasReloj,
   }) async {
     if (sinRed) return Result.error(ApiException.sinConexion());
     enviosEjercicio++;
-    return super.guardarEjercicio(fecha: fecha, minutos: minutos, tipo: tipo);
+    return super.guardarEjercicio(
+      fecha: fecha,
+      minutos: minutos,
+      tipo: tipo,
+      caloriasReloj: caloriasReloj,
+    );
   }
 }
 
@@ -91,25 +99,32 @@ void main() {
     return dia.tiempos.firstWhere((t) => t.tiempo == tiempo);
   }
 
-  test('sin red: encola y devuelve el registro marcado como pendiente', () async {
-    api.sinRed = true;
+  test(
+    'sin red: encola y devuelve el registro marcado como pendiente',
+    () async {
+      api.sinRed = true;
 
-    final resultado = await repositorio.guardarComida(
+      final resultado = await repositorio.guardarComida(
+        fecha: hoy,
+        tiempo: 'comida',
+        estado: EstadoComida.cumplido,
+      );
+
+      expect((resultado as Ok<RegistroComida>).value.pendiente, isTrue);
+      expect(repositorio.totalPendientes, 1);
+      final comida = await tiempoDeHoy('comida');
+      expect(comida.registro?.pendiente, isTrue);
+      expect(comida.registro?.planeado, isNotEmpty);
+    },
+  );
+
+  test('al volver la red vacía la cola y no duplica', () async {
+    api.sinRed = true;
+    await repositorio.guardarComida(
       fecha: hoy,
       tiempo: 'comida',
       estado: EstadoComida.cumplido,
     );
-
-    expect((resultado as Ok<RegistroComida>).value.pendiente, isTrue);
-    expect(repositorio.totalPendientes, 1);
-    final comida = await tiempoDeHoy('comida');
-    expect(comida.registro?.pendiente, isTrue);
-    expect(comida.registro?.planeado, isNotEmpty);
-  });
-
-  test('al volver la red vacía la cola y no duplica', () async {
-    api.sinRed = true;
-    await repositorio.guardarComida(fecha: hoy, tiempo: 'comida', estado: EstadoComida.cumplido);
     await repositorio.guardarComida(
       fecha: hoy,
       tiempo: 'comida',
@@ -118,7 +133,11 @@ void main() {
     );
     await repositorio.guardarAgua(hoy, 6);
     await repositorio.guardarAgua(hoy, 7);
-    expect(repositorio.totalPendientes, 2, reason: 'una por comida y una por agua');
+    expect(
+      repositorio.totalPendientes,
+      2,
+      reason: 'una por comida y una por agua',
+    );
 
     api.sinRed = false;
     await repositorio.reintentarPendientes();
@@ -138,7 +157,11 @@ void main() {
 
   test('si sigue sin red, reintentar no pierde nada', () async {
     api.sinRed = true;
-    await repositorio.guardarComida(fecha: hoy, tiempo: 'cena', estado: EstadoComida.omitido);
+    await repositorio.guardarComida(
+      fecha: hoy,
+      tiempo: 'cena',
+      estado: EstadoComida.omitido,
+    );
 
     await repositorio.reintentarPendientes();
 
@@ -152,7 +175,10 @@ void main() {
       estado: EstadoComida.cambio,
     );
 
-    expect(((resultado as Error<RegistroComida>).error as ApiException).codigo, 400);
+    expect(
+      ((resultado as Error<RegistroComida>).error as ApiException).codigo,
+      400,
+    );
     expect(repositorio.totalPendientes, 0);
   });
 
@@ -181,15 +207,26 @@ void main() {
   test('el ejercicio también se encola y se reintenta sin duplicar', () async {
     api.sinRed = true;
 
-    final resultado = await repositorio.guardarEjercicio(fecha: hoy, minutos: 20, tipo: 'caminata');
-    expect((resultado as Ok).value, (minutos: 20, tipo: 'caminata'));
+    final resultado = await repositorio.guardarEjercicio(
+      fecha: hoy,
+      minutos: 20,
+      tipo: 'caminata',
+    );
+    expect(
+      (resultado as Ok).value,
+      (minutos: 20, tipo: 'caminata', caloriasReloj: null),
+    );
     expect(repositorio.totalPendientes, 1);
     var dia = ((await repositorio.obtenerDia(hoy)) as Ok<Dia>).value;
     expect(dia.ejercicioPendiente, isTrue);
     expect(dia.ejercicioMin, 20);
 
     await repositorio.guardarEjercicio(fecha: hoy, minutos: 30, tipo: 'gym');
-    expect(repositorio.totalPendientes, 1, reason: 'reemplaza al anterior, no se acumula');
+    expect(
+      repositorio.totalPendientes,
+      1,
+      reason: 'reemplaza al anterior, no se acumula',
+    );
 
     api.sinRed = false;
     await repositorio.reintentarPendientes();

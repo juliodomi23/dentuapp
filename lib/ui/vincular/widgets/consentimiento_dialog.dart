@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../../config/app_config.dart';
 import '../../perfil/widgets/privacidad_screen.dart';
 
-/// Consentimiento expreso para datos sensibles (salud y alimentación).
-/// Adaptado de `consent_dialog.dart` de 300 Lugares. Devuelve true si acepta.
 class ConsentimientoDialog extends StatelessWidget {
-  const ConsentimientoDialog({super.key});
+  const ConsentimientoDialog({super.key, this.personal = false});
 
-  static Future<bool?> mostrar(BuildContext context) {
+  final bool personal;
+
+  static Future<bool?> mostrar(BuildContext context, {bool personal = false}) {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const ConsentimientoDialog(),
+      builder: (_) => ConsentimientoDialog(personal: personal),
     );
   }
 
@@ -20,21 +19,19 @@ class ConsentimientoDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Antes de empezar'),
-      content: const SingleChildScrollView(
+      content: SingleChildScrollView(
         child: Text(
-          '${AppConfig.nombreApp} guarda datos de tu salud y alimentación: lo que comes, '
-          'fotos de tus comidas, agua, peso y cómo te sientes. Son datos personales '
-          'sensibles.\n\n'
-          'Los usamos solo para que tu nutrióloga dé seguimiento a tu plan y se '
-          'comparten con tu clínica. Lo que registres por WhatsApp llega al mismo lugar.\n\n'
-          'Para usar la app necesitamos tu consentimiento expreso. Puedes borrar tu '
-          'cuenta cuando quieras desde Perfil.',
+          personal
+              ? 'Dentu guarda tu correo, dieta y los datos de alimentación y salud que registres para mostrarte tu seguimiento. Si importas un PDF o imágenes, enviamos esos archivos temporalmente a nuestro proveedor de inteligencia artificial para transcribirlos. Revisa y corrige el resultado antes de activarlo. Tu cuenta personal no crea un expediente en la clínica ni incluye consulta profesional. Puedes borrarla desde Perfil.'
+              : 'Dentu guarda datos de tu salud y alimentación: lo que comes, fotos de tus comidas, agua, peso y cómo te sientes. Los usamos para que tu nutrióloga dé seguimiento a tu plan y se comparten con tu clínica. Lo que registres por WhatsApp llega al mismo lugar. Puedes borrar tu cuenta desde Perfil.',
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const PrivacidadScreen()),
+            MaterialPageRoute<void>(
+              builder: (_) => PrivacidadScreen(personal: personal),
+            ),
           ),
           child: const Text('Ver aviso de privacidad'),
         ),

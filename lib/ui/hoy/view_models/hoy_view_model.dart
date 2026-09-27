@@ -37,7 +37,9 @@ class HoyViewModel extends ChangeNotifier {
        _reloj = reloj ?? DateTime.now {
     _fecha = soloFecha(_reloj());
     cargarDia = Command0<void>(_cargarDia);
-    registrarComida = Command1<RegistroComida, RegistroComidaInput>(_registrarComida);
+    registrarComida = Command1<RegistroComida, RegistroComidaInput>(
+      _registrarComida,
+    );
     deshacerRegistro = Command1<void, String>(_deshacerRegistro);
     guardarAgua = Command0<void>(_guardarAgua);
     guardarEjercicio = Command0<void>(_guardarEjercicio);
@@ -68,7 +70,8 @@ class HoyViewModel extends ChangeNotifier {
   String? _tiempoEnProceso;
   ({String fecha, int vasos})? _aguaPorGuardar;
   Timer? _temporizadorAgua;
-  ({String fecha, int minutos, String? tipo})? _ejercicioPorGuardar;
+  ({String fecha, int minutos, String? tipo, int? caloriasReloj})?
+  _ejercicioPorGuardar;
   Timer? _temporizadorEjercicio;
 
   Dia? get dia => _dia;
@@ -77,12 +80,13 @@ class HoyViewModel extends ChangeNotifier {
 
   String get tituloFecha => textoFechaConDia(_fecha);
 
-  String? get subtituloFecha => switch (diasEntre(soloFecha(_reloj()), _fecha)) {
-    0 => 'Hoy',
-    -1 => 'Ayer',
-    1 => 'Mañana',
-    _ => null,
-  };
+  String? get subtituloFecha =>
+      switch (diasEntre(soloFecha(_reloj()), _fecha)) {
+        0 => 'Hoy',
+        -1 => 'Ayer',
+        1 => 'Mañana',
+        _ => null,
+      };
 
   bool get esHoy => diasEntre(soloFecha(_reloj()), _fecha) == 0;
 
@@ -99,9 +103,11 @@ class HoyViewModel extends ChangeNotifier {
     final plan = _planActual;
     if (plan == null) return null;
     final partes = [
-      if (plan.caloriasObjetivo != null) '${_numero(plan.caloriasObjetivo!)} kcal',
+      if (plan.caloriasObjetivo != null)
+        '${_numero(plan.caloriasObjetivo!)} kcal',
       if (plan.proteinasG != null) '${_numero(plan.proteinasG!)}g proteína',
-      if (plan.carbohidratosG != null) '${_numero(plan.carbohidratosG!)}g carbos',
+      if (plan.carbohidratosG != null)
+        '${_numero(plan.carbohidratosG!)}g carbos',
       if (plan.grasasG != null) '${_numero(plan.grasasG!)}g grasas',
     ];
     return partes.isEmpty ? null : 'Objetivo del día: ${partes.join(' · ')}';
@@ -114,11 +120,15 @@ class HoyViewModel extends ChangeNotifier {
   (int hechas, int total) get progresoComidas {
     final dia = _dia;
     if (dia == null || dia.tiempos.isEmpty) return (0, 0);
-    return (dia.tiempos.where((t) => t.registro != null).length, dia.tiempos.length);
+    return (
+      dia.tiempos.where((t) => t.registro != null).length,
+      dia.tiempos.length,
+    );
   }
 
   /// Vasos de agua tomados, sobre la meta de referencia.
-  (int vasos, int meta) get progresoAgua => (_dia?.aguaVasos ?? 0, LimitesRegistro.aguaMetaVasos);
+  (int vasos, int meta) get progresoAgua =>
+      (_dia?.aguaVasos ?? 0, LimitesRegistro.aguaMetaVasos);
 
   /// Día actual del Reto 21, sobre el total; null si el paciente no lo tiene activo.
   (int dia, int total)? get progresoReto {
@@ -175,9 +185,11 @@ class HoyViewModel extends ChangeNotifier {
 
   void restarAgua() => _cambiarAgua(-1);
 
-  void sumarMinutosEjercicio() => _cambiarMinutosEjercicio(LimitesRegistro.ejercicioPaso);
+  void sumarMinutosEjercicio() =>
+      _cambiarMinutosEjercicio(LimitesRegistro.ejercicioPaso);
 
-  void restarMinutosEjercicio() => _cambiarMinutosEjercicio(-LimitesRegistro.ejercicioPaso);
+  void restarMinutosEjercicio() =>
+      _cambiarMinutosEjercicio(-LimitesRegistro.ejercicioPaso);
 
   void cambiarTipoEjercicio(String? tipo) {
     final dia = _dia;
@@ -187,7 +199,28 @@ class HoyViewModel extends ChangeNotifier {
       ejercicioTipo: texto,
       borrarEjercicioTipo: texto == null || texto.isEmpty,
     );
-    _programarEjercicio(dia.fecha, _dia!.ejercicioMin, _dia!.ejercicioTipo);
+    _programarEjercicio(
+      dia.fecha,
+      _dia!.ejercicioMin,
+      _dia!.ejercicioTipo,
+      _dia!.caloriasReloj,
+    );
+  }
+
+  void cambiarCaloriasReloj(int? calorias) {
+    final dia = _dia;
+    if (dia == null || !dia.puedeRegistrar) return;
+    if (calorias != null && (calorias < 0 || calorias > 5000)) return;
+    _dia = dia.copyWith(
+      caloriasReloj: calorias,
+      borrarCaloriasReloj: calorias == null,
+    );
+    _programarEjercicio(
+      dia.fecha,
+      _dia!.ejercicioMin,
+      _dia!.ejercicioTipo,
+      calorias,
+    );
   }
 
   @override
@@ -206,6 +239,7 @@ class HoyViewModel extends ChangeNotifier {
           fecha: ejercicioSinEnviar.fecha,
           minutos: ejercicioSinEnviar.minutos,
           tipo: ejercicioSinEnviar.tipo,
+          caloriasReloj: ejercicioSinEnviar.caloriasReloj,
         ),
       );
     }
@@ -253,7 +287,9 @@ class HoyViewModel extends ChangeNotifier {
     if (resultado case Ok(:final value?)) _planActual = value;
   }
 
-  Future<Result<RegistroComida>> _registrarComida(RegistroComidaInput datos) async {
+  Future<Result<RegistroComida>> _registrarComida(
+    RegistroComidaInput datos,
+  ) async {
     _tiempoEnProceso = datos.tiempo;
     notifyListeners();
 
@@ -290,7 +326,8 @@ class HoyViewModel extends ChangeNotifier {
 
     final diaReto = dia.reto21Dia;
     final esHitoReto = diaReto != null && esHitoRacha(diaReto);
-    final diaCompleto = dia.tienePlan && dia.tiempos.every((t) => t.registro != null);
+    final diaCompleto =
+        dia.tienePlan && dia.tiempos.every((t) => t.registro != null);
 
     if (esHitoReto) {
       _fechasCelebradas.add(dia.fecha);
@@ -300,7 +337,10 @@ class HoyViewModel extends ChangeNotifier {
       );
     } else if (diaCompleto) {
       _fechasCelebradas.add(dia.fecha);
-      _celebracionPendiente = (icono: Icons.emoji_events_rounded, mensaje: '¡Completaste todo tu día!');
+      _celebracionPendiente = (
+        icono: Icons.emoji_events_rounded,
+        mensaje: '¡Completaste todo tu día!',
+      );
     }
   }
 
@@ -337,19 +377,40 @@ class HoyViewModel extends ChangeNotifier {
   void _cambiarMinutosEjercicio(int cambio) {
     final dia = _dia;
     if (dia == null || !dia.puedeRegistrar) return;
-    final minutos = (dia.ejercicioMin + cambio).clamp(0, LimitesRegistro.ejercicioMinMax);
+    final minutos = (dia.ejercicioMin + cambio).clamp(
+      0,
+      LimitesRegistro.ejercicioMinMax,
+    );
     if (minutos == dia.ejercicioMin) return;
 
     _dia = dia.copyWith(ejercicioMin: minutos);
-    _programarEjercicio(dia.fecha, minutos, _dia!.ejercicioTipo);
+    _programarEjercicio(
+      dia.fecha,
+      minutos,
+      _dia!.ejercicioTipo,
+      _dia!.caloriasReloj,
+    );
   }
 
-  void _programarEjercicio(String fecha, int minutos, String? tipo) {
-    _ejercicioPorGuardar = (fecha: fecha, minutos: minutos, tipo: tipo);
+  void _programarEjercicio(
+    String fecha,
+    int minutos,
+    String? tipo,
+    int? caloriasReloj,
+  ) {
+    _ejercicioPorGuardar = (
+      fecha: fecha,
+      minutos: minutos,
+      tipo: tipo,
+      caloriasReloj: caloriasReloj,
+    );
     notifyListeners();
 
     _temporizadorEjercicio?.cancel();
-    _temporizadorEjercicio = Timer(esperaAntesDeGuardar, guardarEjercicio.execute);
+    _temporizadorEjercicio = Timer(
+      esperaAntesDeGuardar,
+      guardarEjercicio.execute,
+    );
   }
 
   void _enviarPendientesYa() {
@@ -368,7 +429,10 @@ class HoyViewModel extends ChangeNotifier {
     while (_aguaPorGuardar != null) {
       final porGuardar = _aguaPorGuardar!;
       _aguaPorGuardar = null;
-      final resultado = await _diario.guardarAgua(porGuardar.fecha, porGuardar.vasos);
+      final resultado = await _diario.guardarAgua(
+        porGuardar.fecha,
+        porGuardar.vasos,
+      );
       if (resultado case Error(:final error)) {
         _aviso = mensajeDeError(error);
         _refrescarDesdeCache();
@@ -389,6 +453,7 @@ class HoyViewModel extends ChangeNotifier {
         fecha: porGuardar.fecha,
         minutos: porGuardar.minutos,
         tipo: porGuardar.tipo,
+        caloriasReloj: porGuardar.caloriasReloj,
       );
       if (resultado case Error(:final error)) {
         _aviso = mensajeDeError(error);
@@ -423,12 +488,15 @@ class HoyViewModel extends ChangeNotifier {
       enCache = enCache.copyWith(
         ejercicioMin: ejercicioLocal.minutos,
         ejercicioTipo: ejercicioLocal.tipo,
+        caloriasReloj: ejercicioLocal.caloriasReloj,
         borrarEjercicioTipo: ejercicioLocal.tipo == null,
+        borrarCaloriasReloj: ejercicioLocal.caloriasReloj == null,
       );
     }
     _dia = enCache;
   }
 
-  static String _numero(double valor) =>
-      valor == valor.roundToDouble() ? valor.toStringAsFixed(0) : valor.toStringAsFixed(1);
+  static String _numero(double valor) => valor == valor.roundToDouble()
+      ? valor.toStringAsFixed(0)
+      : valor.toStringAsFixed(1);
 }

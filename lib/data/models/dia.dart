@@ -38,6 +38,7 @@ class Dia {
     this.aguaPendiente = false,
     this.ejercicioMin = 0,
     this.ejercicioTipo,
+    this.caloriasReloj,
     this.ejercicioPendiente = false,
   });
 
@@ -62,6 +63,7 @@ class Dia {
 
   /// Texto libre ("caminata", "gym"), null si no hay registro.
   final String? ejercicioTipo;
+  final int? caloriasReloj;
 
   /// Local: el registro de ejercicio sigue en la cola offline.
   final bool ejercicioPendiente;
@@ -84,6 +86,7 @@ class Dia {
     faltan: (json['faltan'] as List<dynamic>? ?? []).cast<String>(),
     ejercicioMin: (json['ejercicio_min'] as num? ?? 0).toInt(),
     ejercicioTipo: json['ejercicio_tipo'] as String?,
+    caloriasReloj: (json['calorias_reloj'] as num?)?.toInt(),
   );
 
   Dia copyWith({
@@ -93,8 +96,10 @@ class Dia {
     bool? aguaPendiente,
     int? ejercicioMin,
     String? ejercicioTipo,
+    int? caloriasReloj,
     bool? ejercicioPendiente,
     bool borrarEjercicioTipo = false,
+    bool borrarCaloriasReloj = false,
   }) => Dia(
     fecha: fecha,
     diaSemana: diaSemana,
@@ -107,7 +112,12 @@ class Dia {
     faltan: faltan ?? this.faltan,
     aguaPendiente: aguaPendiente ?? this.aguaPendiente,
     ejercicioMin: ejercicioMin ?? this.ejercicioMin,
-    ejercicioTipo: borrarEjercicioTipo ? null : (ejercicioTipo ?? this.ejercicioTipo),
+    ejercicioTipo: borrarEjercicioTipo
+        ? null
+        : (ejercicioTipo ?? this.ejercicioTipo),
+    caloriasReloj: borrarCaloriasReloj
+        ? null
+        : (caloriasReloj ?? this.caloriasReloj),
     ejercicioPendiente: ejercicioPendiente ?? this.ejercicioPendiente,
   );
 }

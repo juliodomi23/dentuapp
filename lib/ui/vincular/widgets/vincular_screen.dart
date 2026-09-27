@@ -5,6 +5,7 @@ import '../../../config/app_config.dart';
 import '../../../data/models/paciente_app.dart';
 import '../../core/widgets/encabezado_clinica.dart';
 import '../view_models/vincular_view_model.dart';
+import 'acceso_personal_screen.dart';
 import 'consentimiento_dialog.dart';
 
 class VincularScreen extends StatefulWidget {
@@ -20,16 +21,9 @@ class _VincularScreenState extends State<VincularScreen> {
   final _formulario = GlobalKey<FormState>();
   final _telefono = TextEditingController();
   final _codigo = TextEditingController();
+  bool? _modoPersonal;
 
   VincularViewModel get _vm => widget.viewModel;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_vm.debePreguntarConsentimiento) _abrirConsentimiento();
-    });
-  }
 
   @override
   void dispose() {
@@ -39,8 +33,24 @@ class _VincularScreenState extends State<VincularScreen> {
   }
 
   Future<void> _abrirConsentimiento() async {
-    final acepta = await ConsentimientoDialog.mostrar(context);
-    if (acepta != null) await _vm.responderConsentimiento(acepta);
+    final acepta = await ConsentimientoDialog.mostrar(
+      context,
+      personal: _modoPersonal ?? false,
+    );
+    if (acepta != null) {
+      await _vm.responderConsentimientoPara(
+        acepta,
+        personal: _modoPersonal ?? false,
+      );
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _elegir(bool personal) {
+    setState(() => _modoPersonal = personal);
+    if (_vm.debePreguntarConsentimientoPara(personal: personal)) {
+      _abrirConsentimiento();
+    }
   }
 
   void _enviar() {
@@ -51,6 +61,27 @@ class _VincularScreenState extends State<VincularScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_modoPersonal == true) {
+      if (_vm.consentimientoAceptadoPara(personal: true)) {
+        return AccesoPersonalScreen(
+          onVolver: () => setState(() => _modoPersonal = null),
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Tu cuenta personal'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Volver a opciones de acceso',
+            onPressed: () => setState(() => _modoPersonal = null),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: _SinConsentimiento(onRevisar: _abrirConsentimiento),
+        ),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
@@ -58,12 +89,84 @@ class _VincularScreenState extends State<VincularScreen> {
           builder: (context, _) {
             final paciente = _vm.pacienteVinculado;
             if (paciente != null) {
-              return _Confirmacion(paciente: paciente, onContinuar: _vm.continuar);
+              return _Confirmacion(
+                paciente: paciente,
+                onContinuar: _vm.continuar,
+              );
             }
-            return _formularioVista(context);
+            return _modoPersonal == null
+                ? _opciones(context)
+                : _formularioVista(context);
           },
         ),
       ),
+    );
+  }
+
+  Widget _opciones(BuildContext context) {
+    final tema = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 32),
+        Text(
+          AppConfig.nombreApp,
+          style: tema.textTheme.displaySmall?.copyWith(
+            color: tema.colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text('Tu seguimiento nutricional', style: tema.textTheme.titleMedium),
+        const SizedBox(height: 32),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Soy paciente de Dentu',
+                  style: tema.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Entra con el código que te dio la clínica para ver tu plan.',
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => _elegir(false),
+                  child: const Text('Entrar con código'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Tengo mi propia dieta',
+                  style: tema.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Crea una cuenta, sube tu dieta en PDF o imágenes y sigue tus comidas.',
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => _elegir(true),
+                  child: const Text('Usar mi dieta'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -84,12 +187,18 @@ class _VincularScreenState extends State<VincularScreen> {
         const SizedBox(height: 24),
         if (_vm.sesionExpirada)
           const _Aviso(
-            texto: 'Tu sesión terminó. Pide un nuevo código a tu clínica para volver a entrar.',
+            texto:
+                'Tu sesión terminó. Pide un nuevo código a tu clínica para volver a entrar.',
           ),
         if (_vm.consentimientoAceptado)
           _formularioVinculacion(tema)
         else
           _SinConsentimiento(onRevisar: _abrirConsentimiento),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => setState(() => _modoPersonal = null),
+          child: const Text('Volver a opciones de acceso'),
+        ),
       ],
     );
   }
@@ -127,7 +236,8 @@ class _VincularScreenState extends State<VincularScreen> {
             decoration: const InputDecoration(
               labelText: 'Código de 6 dígitos',
               prefixIcon: Icon(Icons.lock_outline_rounded),
-              helperText: 'Pídelo a tu clínica por WhatsApp: escribe "quiero la app".',
+              helperText:
+                  'Pídelo a tu clínica por WhatsApp: escribe "quiero la app".',
               helperMaxLines: 2,
             ),
             validator: _vm.validarCodigo,
@@ -137,7 +247,10 @@ class _VincularScreenState extends State<VincularScreen> {
           if (_vm.mensajeError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text(_vm.mensajeError!, style: TextStyle(color: tema.colorScheme.error)),
+              child: Text(
+                _vm.mensajeError!,
+                style: TextStyle(color: tema.colorScheme.error),
+              ),
             ),
           FilledButton(
             onPressed: cargando ? null : _enviar,
@@ -145,7 +258,10 @@ class _VincularScreenState extends State<VincularScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, semanticsLabel: 'Vinculando'),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: 'Vinculando',
+                    ),
                   )
                 : const Text('Vincular mi app'),
           ),
@@ -170,7 +286,10 @@ class _SinConsentimiento extends StatelessWidget {
           'salud y alimentación.',
         ),
         const SizedBox(height: 16),
-        FilledButton(onPressed: onRevisar, child: const Text('Revisar de nuevo')),
+        FilledButton(
+          onPressed: onRevisar,
+          child: const Text('Revisar de nuevo'),
+        ),
       ],
     );
   }
@@ -211,7 +330,10 @@ class _Confirmacion extends StatelessWidget {
         const SizedBox(height: 48),
         EncabezadoClinica(clinica: paciente.clinica, tamanoLogo: 72),
         const SizedBox(height: 32),
-        Text('¡Listo, ${paciente.nombre}!', style: tema.textTheme.headlineSmall),
+        Text(
+          '¡Listo, ${paciente.nombre}!',
+          style: tema.textTheme.headlineSmall,
+        ),
         const SizedBox(height: 8),
         Text(
           'Tu app quedó vinculada con ${paciente.clinica.nombre}. Aquí vas a ver tu '

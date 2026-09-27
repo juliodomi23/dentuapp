@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../config/constantes.dart';
 import '../../../config/tema.dart';
 import '../../../data/models/dia.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/diario_repository.dart';
 import '../../core/widgets/avisos.dart';
 import '../../core/widgets/dialogo_preparacion.dart';
@@ -53,14 +54,21 @@ class _HoyScreenState extends State<HoyScreen> {
 
     final celebracion = _vm.tomarCelebracion();
     if (celebracion != null) {
-      mostrarCelebracion(context, icono: celebracion.icono, mensaje: celebracion.mensaje);
+      mostrarCelebracion(
+        context,
+        icono: celebracion.icono,
+        mensaje: celebracion.mensaje,
+      );
     }
   }
 
   Future<void> _registrar(TiempoDia tiempoDia, String estado) async {
     String? queComio;
     if (estado == EstadoComida.cambio) {
-      queComio = await DialogoQueComio.mostrar(context, planeado: tiempoDia.planeado);
+      queComio = await DialogoQueComio.mostrar(
+        context,
+        planeado: tiempoDia.planeado,
+      );
       if (queComio == null) return;
     }
     _vm.registrarComida.execute((
@@ -92,7 +100,10 @@ class _HoyScreenState extends State<HoyScreen> {
       ));
     } on PlatformException {
       if (mounted) {
-        mostrarAviso(context, 'No pudimos abrir la cámara o la galería. Revisa los permisos.');
+        mostrarAviso(
+          context,
+          'No pudimos abrir la cámara o la galería. Revisa los permisos.',
+        );
       }
     }
   }
@@ -130,7 +141,9 @@ class _HoyScreenState extends State<HoyScreen> {
 
   void _abrirEjercicio() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => EjercicioDetalleScreen(viewModel: _vm)),
+      MaterialPageRoute(
+        builder: (context) => EjercicioDetalleScreen(viewModel: _vm),
+      ),
     );
   }
 
@@ -168,19 +181,26 @@ class _HoyScreenState extends State<HoyScreen> {
       if (_vm.cargarDia.running) return const [EstadoCargando()];
       final error = _vm.mensajeErrorCarga;
       if (error != null) {
-        return [EstadoError(mensaje: error, onReintentar: _vm.cargarDia.execute)];
+        return [
+          EstadoError(mensaje: error, onReintentar: _vm.cargarDia.execute),
+        ];
       }
       return const [];
     }
 
     final textoObjetivo = _vm.textoObjetivoDia;
     final textoSoloLectura = _vm.textoSoloLectura();
-    final textoPlanVacio = _vm.textoPlanVacio();
+    final textoPlanVacio =
+        context.read<AuthRepository>().paciente?.esPersonal == true &&
+            !dia.tienePlan
+        ? 'Abre Semana para importar el PDF o las fotos de tu dieta.'
+        : _vm.textoPlanVacio();
     final (comidasHechas, comidasTotal) = _vm.progresoComidas;
     final (vasos, metaAgua) = _vm.progresoAgua;
     final progresoReto = _vm.progresoReto;
     return [
-      if (_vm.cargarDia.running) const LinearProgressIndicator(semanticsLabel: 'Actualizando'),
+      if (_vm.cargarDia.running)
+        const LinearProgressIndicator(semanticsLabel: 'Actualizando'),
       if (comidasTotal > 0 || vasos > 0 || progresoReto != null) ...[
         Card(
           child: Padding(
@@ -250,7 +270,9 @@ class _HoyScreenState extends State<HoyScreen> {
             puedeRegistrar: dia.puedeRegistrar,
             esEquivalentes: dia.esEquivalentes,
             ocupado: _vm.tiempoEnProceso == tiempoDia.tiempo,
-            urlFoto: tiempoDia.registro == null ? null : _vm.urlFotoDe(tiempoDia.registro!),
+            urlFoto: tiempoDia.registro == null
+                ? null
+                : _vm.urlFotoDe(tiempoDia.registro!),
             cabecerasFoto: _vm.cabecerasFoto(),
             onRegistrar: (estado) => _registrar(tiempoDia, estado),
             onDeshacer: () => _vm.deshacerRegistro.execute(tiempoDia.tiempo),

@@ -43,17 +43,30 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Future<void> _registrarPeso() async {
-    final peso = await pedirPeso(context, validar: _vm.validarPeso, leerPeso: _vm.leerPeso);
+    final peso = await pedirPeso(
+      context,
+      validar: _vm.validarPeso,
+      leerPeso: _vm.leerPeso,
+    );
     if (peso != null) _vm.registrarPeso.execute(peso);
   }
 
   Future<void> _cerrarSesion() async {
-    final confirma = await confirmarCerrarSesion(context, pendientes: _vm.pendientesSinEnviar);
+    final confirma = await confirmarCerrarSesion(
+      context,
+      pendientes: _vm.pendientesSinEnviar,
+      personal: _vm.paciente?.esPersonal ?? false,
+    );
     if (confirma) _vm.cerrarSesion.execute();
   }
 
   Future<void> _borrarCuenta() async {
-    if (await confirmarBorrarCuenta(context)) _vm.borrarCuenta.execute();
+    if (await confirmarBorrarCuenta(
+      context,
+      personal: _vm.paciente?.esPersonal ?? false,
+    )) {
+      _vm.borrarCuenta.execute();
+    }
   }
 
   @override
@@ -70,7 +83,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
-            if (_vm.ocupado) const LinearProgressIndicator(semanticsLabel: 'Procesando'),
+            if (_vm.ocupado)
+              const LinearProgressIndicator(semanticsLabel: 'Procesando'),
             _encabezado(context),
             const Divider(),
             ListTile(
@@ -97,19 +111,27 @@ class _PerfilScreenState extends State<PerfilScreen> {
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => _abrir(
                 (context) => RecordatoriosScreen(
-                  viewModel: RecordatoriosViewModel(recordatorios: context.read()),
+                  viewModel: RecordatoriosViewModel(
+                    recordatorios: context.read(),
+                  ),
                 ),
               ),
             ),
             const Divider(),
-            const _TituloSeccion('Mis datos'),
-            MisDatos(viewModel: _vm),
-            const Divider(),
+            if (_vm.paciente?.esPersonal != true) ...[
+              const _TituloSeccion('Mis datos'),
+              MisDatos(viewModel: _vm),
+              const Divider(),
+            ],
             ListTile(
               leading: const Icon(Icons.privacy_tip_rounded),
               title: const Text('Aviso de privacidad'),
               trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => _abrir((_) => const PrivacidadScreen()),
+              onTap: () => _abrir(
+                (_) => PrivacidadScreen(
+                  personal: _vm.paciente?.esPersonal ?? false,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.logout_rounded),
@@ -118,7 +140,10 @@ class _PerfilScreenState extends State<PerfilScreen> {
               onTap: _cerrarSesion,
             ),
             ListTile(
-              leading: Icon(Icons.delete_forever_rounded, color: Theme.of(context).colorScheme.error),
+              leading: Icon(
+                Icons.delete_forever_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
               title: Text(
                 'Borrar cuenta',
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -141,7 +166,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          EncabezadoClinica(clinica: paciente.clinica),
+          if (!paciente.esPersonal)
+            EncabezadoClinica(clinica: paciente.clinica),
           const SizedBox(height: 16),
           Text(paciente.nombreCompleto, style: tema.textTheme.titleLarge),
           if (paciente.objetivo != null) Text('Objetivo: ${paciente.objetivo}'),

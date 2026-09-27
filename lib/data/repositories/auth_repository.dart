@@ -30,6 +30,7 @@ class AuthRepository extends ChangeNotifier {
   static const _clavePaciente = 'paciente';
   static const _claveUltimoPaciente = 'ultimo_paciente_id';
   static const _claveConsentimiento = 'consentimiento_datos_salud_v1';
+  static const _claveConsentimientoPersonal = 'consentimiento_personal_v1';
 
   final ApiService _api;
   final SecureStorageService _almacenamiento;
@@ -55,8 +56,17 @@ class AuthRepository extends ChangeNotifier {
   /// null = todavía no se le preguntó.
   bool? get consentimiento => _preferencias.leerBool(_claveConsentimiento);
 
+  bool? consentimientoPara({required bool personal}) => _preferencias.leerBool(
+    personal ? _claveConsentimientoPersonal : _claveConsentimiento,
+  );
+
   Future<void> guardarConsentimiento(bool acepta) async {
     await _preferencias.guardarBool(_claveConsentimiento, acepta);
+    notifyListeners();
+  }
+
+  Future<void> guardarConsentimientoPersonal(bool acepta) async {
+    await _preferencias.guardarBool(_claveConsentimientoPersonal, acepta);
     notifyListeners();
   }
 
@@ -77,7 +87,10 @@ class AuthRepository extends ChangeNotifier {
     final resultado = await _api.obtenerPerfil();
     if (resultado case Ok(:final value)) {
       _paciente = value;
-      await _almacenamiento.escribir(_clavePaciente, jsonEncode(value.toJson()));
+      await _almacenamiento.escribir(
+        _clavePaciente,
+        jsonEncode(value.toJson()),
+      );
       notifyListeners();
     }
     return resultado;
@@ -108,6 +121,39 @@ class AuthRepository extends ChangeNotifier {
     }
   }
 
+  Future<Result<PacienteApp>> crearCuentaPersonal({
+    required String nombre,
+    required String email,
+    required String password,
+  }) => _iniciarPersonal(
+    _api.crearCuentaPersonal(nombre: nombre, email: email, password: password),
+  );
+
+  Future<Result<PacienteApp>> entrarCuentaPersonal({
+    required String email,
+    required String password,
+  }) => _iniciarPersonal(
+    _api.iniciarCuentaPersonal(email: email, password: password),
+  );
+
+  Future<Result<PacienteApp>> _iniciarPersonal(
+    Future<Result<ResultadoVinculacion>> peticion,
+  ) async {
+    final resultado = await peticion;
+    if (resultado case Error(:final error)) return Result.error(error);
+    final datos = (resultado as Ok<ResultadoVinculacion>).value;
+    final anterior = await _leer(_claveUltimoPaciente);
+    _cambioDePaciente = anterior != null && anterior != datos.paciente.id;
+    final guardado = await _guardarSesion(datos, _api.urlVinculacion);
+    if (guardado case Error(:final error)) return Result.error(error);
+    _token = datos.token;
+    _baseUrl = _api.urlVinculacion;
+    _paciente = datos.paciente;
+    _sesionExpirada = false;
+    _cambiarEstado(EstadoSesion.conSesion);
+    return Result.ok(datos.paciente);
+  }
+
   void confirmarVinculacion() {
     if (_token == null) return;
     _cambiarEstado(EstadoSesion.conSesion);
@@ -119,12 +165,16 @@ class AuthRepository extends ChangeNotifier {
     final resultado = await _api.borrarCuenta();
     if (resultado is Ok) {
       await _preferencias.borrar(_claveConsentimiento);
+      await _preferencias.borrar(_claveConsentimientoPersonal);
       await _limpiarSesion(olvidarPaciente: true);
     }
     return resultado;
   }
 
-  Future<Result<void>> _guardarSesion(ResultadoVinculacion datos, String baseUrl) async {
+  Future<Result<void>> _guardarSesion(
+    ResultadoVinculacion datos,
+    String baseUrl,
+  ) async {
     final escrituras = [
       await _almacenamiento.escribir(_claveToken, datos.token),
       await _almacenamiento.escribir(_claveBaseUrl, baseUrl),
@@ -134,7 +184,10 @@ class AuthRepository extends ChangeNotifier {
       ),
       await _almacenamiento.escribir(_claveUltimoPaciente, datos.paciente.id),
     ];
-    return escrituras.firstWhere((r) => r is Error, orElse: () => const Result.ok(null));
+    return escrituras.firstWhere(
+      (r) => r is Error,
+      orElse: () => const Result.ok(null),
+    );
   }
 
   void _expirarSesion() {

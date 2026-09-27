@@ -9,9 +9,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Dentu</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Usamos la cámara para que puedas tomar una foto de tu comida y agregarla a tu registro.</string>
+	<string>Usamos la cámara para fotografiar tu comida o la dieta que quieras importar.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Usamos tus fotos para que puedas elegir la foto de tu comida y agregarla a tu registro.</string>
+	<string>Usamos tus fotos para registrar comidas o importar la imagen de tu dieta.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

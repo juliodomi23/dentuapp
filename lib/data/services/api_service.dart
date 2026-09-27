@@ -51,6 +51,83 @@ class ApiService {
     );
   }
 
+  Future<Result<ResultadoVinculacion>> crearCuentaPersonal({
+    required String nombre,
+    required String email,
+    required String password,
+  }) => _enviar(
+    () => _cliente.post(
+      Uri.parse('$urlVinculacion/api/app/auth/personal/registro'),
+      headers: _cabeceras(),
+      body: jsonEncode({
+        'nombre': nombre,
+        'email': email,
+        'password': password,
+      }),
+    ),
+    (json) => ResultadoVinculacion.fromJson(json as Map<String, dynamic>),
+    avisarNoAutorizado: false,
+  );
+
+  Future<Result<ResultadoVinculacion>> iniciarCuentaPersonal({
+    required String email,
+    required String password,
+  }) => _enviar(
+    () => _cliente.post(
+      Uri.parse('$urlVinculacion/api/app/auth/personal/login'),
+      headers: _cabeceras(),
+      body: jsonEncode({'email': email, 'password': password}),
+    ),
+    (json) => ResultadoVinculacion.fromJson(json as Map<String, dynamic>),
+    avisarNoAutorizado: false,
+  );
+
+  Future<Result<Map<String, dynamic>>> extraerDieta(List<String> rutas) =>
+      _enviar(
+        () async {
+          final peticion = http.MultipartRequest(
+            'POST',
+            _uri('/api/app/plan/personal/extraer'),
+          )..headers.addAll(_cabeceras(esJson: false));
+          for (final ruta in rutas) {
+            peticion.files.add(
+              await http.MultipartFile.fromPath('archivos', ruta),
+            );
+          }
+          return http.Response.fromStream(await _cliente.send(peticion));
+        },
+        (json) => json as Map<String, dynamic>,
+        timeout: const Duration(seconds: 100),
+      );
+
+  Future<Result<Plan>> guardarDietaPersonal(Map<String, dynamic> borrador) =>
+      _enviar(
+        () => _cliente.put(
+          _uri('/api/app/plan/personal'),
+          headers: _cabeceras(),
+          body: jsonEncode(borrador),
+        ),
+        (json) => Plan.fromJson(
+          (json as Map<String, dynamic>)['plan'] as Map<String, dynamic>,
+        ),
+      );
+
+  Future<Result<Map<String, dynamic>>> consultarIap() => _enviar(
+    () => _cliente.get(_uri('/api/app/iap/estado'), headers: _cabeceras()),
+    (json) => json as Map<String, dynamic>,
+  );
+
+  Future<Result<Map<String, dynamic>>> validarCompraApple(String recibo) =>
+      _enviar(
+        () => _cliente.post(
+          _uri('/api/app/iap/apple/validar'),
+          headers: _cabeceras(),
+          body: jsonEncode({'recibo': recibo}),
+        ),
+        (json) => json as Map<String, dynamic>,
+        timeout: const Duration(seconds: 40),
+      );
+
   Future<Result<PacienteApp>> obtenerPerfil() {
     return _enviar(
       () => _cliente.get(_uri('/api/app/me'), headers: _cabeceras()),
@@ -70,7 +147,9 @@ class ApiService {
       () => _cliente.get(_uri('/api/app/plan/semana'), headers: _cabeceras()),
       (json) {
         final plan = (json as Map<String, dynamic>)['plan'];
-        return plan == null ? null : Plan.fromJson(plan as Map<String, dynamic>);
+        return plan == null
+            ? null
+            : Plan.fromJson(plan as Map<String, dynamic>);
       },
     );
   }
@@ -87,7 +166,8 @@ class ApiService {
   /// Cacheado en n8n por el texto del platillo (no por paciente), así que
   /// suele responder al instante salvo la primera vez que se pide ese platillo.
   Future<Result<Preparacion>> obtenerPreparacion(String platillo) {
-    final ruta = '/api/app/preparacion?platillo=${Uri.encodeQueryComponent(platillo)}';
+    final ruta =
+        '/api/app/preparacion?platillo=${Uri.encodeQueryComponent(platillo)}';
     return _enviar(
       () => _cliente.get(_uri(ruta), headers: _cabeceras()),
       (json) => Preparacion.fromJson(json as Map<String, dynamic>),
@@ -148,22 +228,29 @@ class ApiService {
     );
   }
 
-  Future<Result<({int minutos, String? tipo})>> guardarEjercicio({
+  Future<Result<({int minutos, String? tipo, int? caloriasReloj})>>
+  guardarEjercicio({
     required String fecha,
     required int minutos,
     String? tipo,
+    int? caloriasReloj,
   }) {
     return _enviar(
       () => _cliente.put(
         _uri('/api/app/dia/$fecha/ejercicio'),
         headers: _cabeceras(),
-        body: jsonEncode({'ejercicio_min': minutos, 'ejercicio_tipo': ?tipo}),
+        body: jsonEncode({
+          'ejercicio_min': minutos,
+          'ejercicio_tipo': tipo,
+          'calorias_reloj': caloriasReloj,
+        }),
       ),
       (json) {
         final cuerpo = json as Map<String, dynamic>;
         return (
           minutos: (cuerpo['ejercicio_min'] as num).toInt(),
           tipo: cuerpo['ejercicio_tipo'] as String?,
+          caloriasReloj: (cuerpo['calorias_reloj'] as num?)?.toInt(),
         );
       },
     );
@@ -208,9 +295,9 @@ class ApiService {
   }
 
   Future<Result<Progreso>> obtenerProgreso({String? desde}) {
-    final uri = _uri('/api/app/progreso').replace(
-      queryParameters: desde == null ? null : {'desde': desde},
-    );
+    final uri = _uri(
+      '/api/app/progreso',
+    ).replace(queryParameters: desde == null ? null : {'desde': desde});
     return _enviar(
       () => _cliente.get(uri, headers: _cabeceras()),
       (json) => Progreso.fromJson(json as Map<String, dynamic>),
@@ -224,8 +311,7 @@ class ApiService {
     );
   }
 
-  String urlFoto(String fotoId) =>
-      _uri('/api/app/fotos/$fotoId').toString();
+  String urlFoto(String fotoId) => _uri('/api/app/fotos/$fotoId').toString();
 
   Map<String, String> cabecerasFoto() {
     final token = leerToken?.call();
@@ -248,9 +334,10 @@ class ApiService {
     Future<http.Response> Function() peticion,
     T Function(dynamic json) convertir, {
     bool avisarNoAutorizado = true,
+    Duration? timeout,
   }) async {
     try {
-      final respuesta = await peticion().timeout(_timeout);
+      final respuesta = await peticion().timeout(timeout ?? _timeout);
       final codigo = respuesta.statusCode;
 
       if (codigo == 401 && avisarNoAutorizado) alNoAutorizado?.call();
@@ -294,7 +381,7 @@ class ApiService {
     }
     return switch (respuesta.statusCode) {
       400 || 422 => 'Revisa los datos e intenta de nuevo.',
-      401 => 'Tu sesión terminó. Vuelve a vincular la app.',
+      401 => 'Tu sesión terminó. Vuelve a iniciar sesión.',
       404 => 'No se encontró la información.',
       413 => 'La foto pesa más de 5 MB.',
       415 => 'Ese formato de foto no se puede subir.',

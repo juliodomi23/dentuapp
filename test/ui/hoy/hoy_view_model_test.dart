@@ -24,7 +24,11 @@ Dia diaDePrueba({int? reto21Dia}) => Dia(
   reto21Dia: reto21Dia ?? 8,
   tiempos: [
     for (final tiempo in kTiempos)
-      TiempoDia(tiempo: tiempo, planeado: 'Platillo de $tiempo', registro: null),
+      TiempoDia(
+        tiempo: tiempo,
+        planeado: 'Platillo de $tiempo',
+        registro: null,
+      ),
   ],
   faltan: kTiempos,
 );
@@ -34,7 +38,8 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
   Result<Dia> respuestaCarga = Result.ok(diaDePrueba());
   bool registrarComoPendiente = false;
   final List<({String fecha, int vasos})> aguaGuardada = [];
-  final List<({String fecha, int minutos, String? tipo})> ejercicioGuardado = [];
+  final List<({String fecha, int minutos, String? tipo})> ejercicioGuardado =
+      [];
   Dia? _dia;
 
   @override
@@ -45,7 +50,9 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
 
   @override
   Future<Result<Dia>> obtenerDia(String fecha) async {
-    final resultado = cargaEnCurso != null ? await cargaEnCurso!.future : respuestaCarga;
+    final resultado = cargaEnCurso != null
+        ? await cargaEnCurso!.future
+        : respuestaCarga;
     if (resultado case Ok(:final value)) _dia = value;
     return resultado;
   }
@@ -79,7 +86,8 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
     );
     _dia = _dia!.copyWith(
       tiempos: [
-        for (final t in _dia!.tiempos) t.tiempo == tiempo ? t.conRegistro(registro) : t,
+        for (final t in _dia!.tiempos)
+          t.tiempo == tiempo ? t.conRegistro(registro) : t,
       ],
     );
     notifyListeners();
@@ -87,7 +95,8 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
   }
 
   @override
-  Future<Result<void>> borrarComida(String fecha, String tiempo) async => const Result.ok(null);
+  Future<Result<void>> borrarComida(String fecha, String tiempo) async =>
+      const Result.ok(null);
 
   @override
   Future<Result<int>> guardarAgua(String fecha, int vasos) async {
@@ -97,10 +106,12 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
   }
 
   @override
-  Future<Result<({int minutos, String? tipo})>> guardarEjercicio({
+  Future<Result<({int minutos, String? tipo, int? caloriasReloj})>>
+  guardarEjercicio({
     required String fecha,
     required int minutos,
     String? tipo,
+    int? caloriasReloj,
   }) async {
     ejercicioGuardado.add((fecha: fecha, minutos: minutos, tipo: tipo));
     _dia = _dia!.copyWith(
@@ -108,7 +119,11 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
       ejercicioTipo: tipo,
       borrarEjercicioTipo: tipo == null,
     );
-    return Result.ok((minutos: minutos, tipo: tipo));
+    return Result.ok((
+      minutos: minutos,
+      tipo: tipo,
+      caloriasReloj: caloriasReloj,
+    ));
   }
 
   @override
@@ -129,6 +144,15 @@ class FakeDiarioRepository extends ChangeNotifier implements DiarioRepository {
 }
 
 class FakePlanRepository implements PlanRepository {
+  @override
+  Future<Result<Map<String, dynamic>>> extraerDieta(List<String> rutas) async =>
+      const Result.error(ApiException(404, 'Sin plan'));
+
+  @override
+  Future<Result<Plan>> guardarDietaPersonal(
+    Map<String, dynamic> borrador,
+  ) async => const Result.error(ApiException(404, 'Sin plan'));
+
   @override
   Future<Result<Plan?>> obtenerSemana() async => const Result.ok(null);
 
@@ -241,7 +265,11 @@ void main() {
     await pumpEventQueue();
 
     expect(diario.ejercicioGuardado, [
-      (fecha: '2026-09-11', minutos: LimitesRegistro.ejercicioPaso * 2, tipo: null),
+      (
+        fecha: '2026-09-11',
+        minutos: LimitesRegistro.ejercicioPaso * 2,
+        tipo: null,
+      ),
     ]);
   });
 
@@ -333,6 +361,15 @@ void main() {
 }
 
 class _PlanConMacros implements PlanRepository {
+  @override
+  Future<Result<Map<String, dynamic>>> extraerDieta(List<String> rutas) async =>
+      const Result.error(ApiException(404, 'Sin plan'));
+
+  @override
+  Future<Result<Plan>> guardarDietaPersonal(
+    Map<String, dynamic> borrador,
+  ) async => const Result.error(ApiException(404, 'Sin plan'));
+
   @override
   Future<Result<Plan?>> obtenerSemana() async => Result.ok(
     Plan(
